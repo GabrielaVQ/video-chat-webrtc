@@ -9,10 +9,12 @@ var username;
 var webSocket;
 
 function webSocketOnMessage(event){
+
     var parsedData = JSON.parse(event.data);
 
     var peerUsername = parsedData['peer'];
     var action = parsedData['action'];
+
 
     if(username == peerUsername){
         return
@@ -44,6 +46,7 @@ function webSocketOnMessage(event){
 
 }
 
+/* Inicio botón unirse a sala */
 btnJoin.addEventListener('click', () => {
     username = usernameInput.value;
     console.log('username: ', username);
@@ -73,22 +76,26 @@ btnJoin.addEventListener('click', () => {
     var endPoint = wsStart + loc.host + loc.pathname;
     console.log('endPoint: ', endPoint);
 
-    webSocket = new WebSocket(endPoint);
+    webSocket = new WebSocket(endPoint); //Se ejecuta función connect de consumers.py
 
     webSocket.addEventListener('open', (e) => {
-        console.log('Connection opened');
+        console.log('Connection opened para nuevo websocket.');
         
         sendSignal('new-peer', {});
     });
     webSocket.addEventListener('message', webSocketOnMessage);
+
     webSocket.addEventListener('close', (e) => {
         console.log('Connection closed');
     })
+    
     webSocket.addEventListener('error', (e) => {
         console.log('Error ocurred');
     })
 })
+/* Fin botón unirse a sala */
 
+/* Inicio acceso funcionalidades cámara local */
 var localStream = new MediaStream();
 
 const constraints = {
@@ -134,6 +141,7 @@ var userMedia = navigator.mediaDevices.getUserMedia(constraints)
     .catch(error => {
         console.log('Error accessing media devices.', error);
     })
+/* Fin acceso funcionalidades cámara local */
 
 function sendSignal(action, message) {
     var jsonStr = JSON.stringify({
@@ -142,7 +150,7 @@ function sendSignal(action, message) {
         'message': message,
     });
     
-    webSocket.send(jsonStr);
+    webSocket.send(jsonStr); //Se ejecuta función receive de consumers.py
 }
 
 function createOfferer(peerUsername, receiver_channel_name){
@@ -152,9 +160,10 @@ function createOfferer(peerUsername, receiver_channel_name){
 
     var dc = peer.createDataChannel('channel');
     dc.addEventListener('open', () => {
-        console.log('Connection opened');
+        console.log('Connection opened para nuevo RTCPeer oferta');
     });
-    dc.addEventListener('message', dcOnMessage);
+
+    dc.addEventListener('message', dcOnMessage); // Para mensajes del chat
 
     var remoteVideo = createVideo(peerUsername);
     setOnTrack(peer, remoteVideo);
@@ -175,12 +184,15 @@ function createOfferer(peerUsername, receiver_channel_name){
         }
     });
 
-    peer.addEventListener('icecandidate', (addEventListener)  => {
+    peer.addEventListener('icecandidate', (event)  => {
+
         if(event.candidate){
-            console.log('New ice candidate', JSON.stringify(peer.localDescription));
+            //console.log('New ice candidate', JSON.stringify(peer.localDescription));
+            console.log('New ice candidate');
             return;
         }
 
+        console.log('Se enviará sendSignal');
         sendSignal('new-offer', {
             'sdp': peer.localDescription,
             'receiver_channel_name': receiver_channel_name
@@ -205,9 +217,10 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
     peer.addEventListener('datachannel', e => {
         peer.dc = e.channel;
         peer.dc.addEventListener('open', () => {
-            console.log('Connection opened');
+            console.log('Connection opened para RTCPeer respuesta');
         });
-        peer.dc.addEventListener('message', dcOnMessage);
+
+        peer.dc.addEventListener('message', dcOnMessage); // Para enviar mensajes por chat
 
         mapPeers[peerUsername] = [peer, peer.dc];
     });    
@@ -226,9 +239,9 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
         }
     });
 
-    peer.addEventListener('icecandidate', (addEventListener)  => {
+    peer.addEventListener('icecandidate', (event)  => {
         if(event.candidate){
-            console.log('New ice candidate', JSON.stringify(peer.localDescription));
+            //console.log('New ice candidate', JSON.stringify(peer.localDescription));
             return;
         }
 
@@ -262,7 +275,7 @@ function dcOnMessage(event){
     var message = event.data;
 
     var li = document.createElement('li');
-    li.appendChild(document.createTextMode(message));
+    li.appendChild(document.createTextNode(message));
     messageList.appendChild(li);
 }
 
@@ -290,6 +303,7 @@ function setOnTrack(peer, remoteVideo){
     peer.addEventListener('track', async (event) => {
         remoteStream.addTrack(event.track, remoteStream);
     })
+    
 }
 
 function removeVideo(video){
