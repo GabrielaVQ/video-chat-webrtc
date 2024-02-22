@@ -5,6 +5,9 @@ import asyncio
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+
+        print('Ejecutando consumers.py-connect')
+
         self.room_group_name = 'Test-Room'
 
         await self.channel_layer.group_add(
@@ -15,7 +18,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        
+
+        print('Ejecutando consumers.py-disconnect')
+
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
@@ -24,6 +29,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         print('Disconnected!')
         
     async def receive(self, text_data):
+
+        print('Ejecutando consumers.py-receive')
+
         receive_dict = json.loads(text_data)
         message = receive_dict['message']
         action = receive_dict['action']
@@ -53,6 +61,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def send_sdp(self, event):
+
+        print('Ejecutando consumers.py-sendsdp')
+        
         receive_dict = event['receive_dict']
 
         await self.send(text_data=json.dumps(receive_dict))
