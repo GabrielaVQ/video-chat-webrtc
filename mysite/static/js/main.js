@@ -1,12 +1,43 @@
 console.log('In main.js');
 
+const IMAGE_INTERVAL_MS = 1000;
+
 var mapPeers = {}; //Pares nuevos que se unen, no incluye el local
+var intervalIds = {};
 
 var usernameInput = document.querySelector('#username');
 var btnJoin = document.querySelector('#btn-join');
 
 var username;
 var webSocket;
+
+var localCanvas = document.getElementById("myCanvas");
+
+function cleanFaceRectangles(video, canvas) {
+    const ctx = canvas.getContext('2d');
+
+    ctx.width = video.videoWidth;
+    ctx.height = video.videoHeight;
+  
+    ctx.beginPath();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.stroke();
+}
+function drawFaceRectangles(video, canvas, face) {
+    const ctx = canvas.getContext('2d');
+  
+    ctx.width = video.videoWidth;
+    ctx.height = video.videoHeight;
+  
+    ctx.beginPath();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "green";
+    ctx.lineWidth = 5
+    ctx.beginPath();
+    ctx.rect(face[0], face[1], face[2], face[3]);
+    ctx.stroke();
+}
 
 function webSocketOnMessage(event){
 
@@ -15,18 +46,33 @@ function webSocketOnMessage(event){
     var peerUsername = parsedData['peer'];
     var action = parsedData['action'];
 
-    if(username == peerUsername){
-        return
-    }
-        
+    console.log('------');
+    console.log(username, ' - ', peerUsername);
+    console.log('------', action);
+
     var receiver_channel_name = parsedData['message']['receiver_channel_name'];
 
-    if(action == 'new-peer'){
+    if(username == peerUsername){
+        if(action == 'frame'){
+            var peerFrame = parsedData['message']['peerUsername'];
+            var peerVideo = document.querySelector('#' + peerFrame + '-video');
+            var peerCanvas = document.querySelector('#' + peerFrame + '-canvas');
+            if(parsedData['message']['face']){
+                console.log(parsedData['message']['face']);
+                drawFaceRectangles(peerVideo, peerCanvas, parsedData['message']['face']);
+            }else{
+                /* cleanFaceRectangles(peerVideo, peerCanvas); */
+            }
+        }
+        return
+    }
+
+    if(action == 'new-peer'){ console.log('MESSAGE: New peer');
         createOfferer(peerUsername, receiver_channel_name);
         return;
     }
 
-    if(action == 'new-offer'){
+    if(action == 'new-offer'){ console.log('MESSAGE: New offer');
         var offer = parsedData['message']['sdp'];
 
         createAnswerer(offer, peerUsername, receiver_channel_name);
@@ -34,7 +80,7 @@ function webSocketOnMessage(event){
         return;
     }
 
-    if(action == 'new-answer'){
+    if(action == 'new-answer'){ console.log('MESSAGE: New answer');
         var answer = parsedData['message']['sdp'];
         var peer = mapPeers[peerUsername][0];
 
@@ -98,11 +144,14 @@ btnJoin.addEventListener('click', () => {
 var localStream = new MediaStream();
 
 const constraints = {
-    'video': true,
-    'audio': true
+    audio: true,
+    video: {
+        width: {max: 640},
+        height: {max: 480}
+    }
 };
 
-const localVideo = document.querySelector('#local-video');
+const localVideo = document.querySelector('#localVideo');
 
 const btnToggleAudio = document.querySelector('#btn-toggle-audio');
 const btnToggleVideo = document.querySelector('#btn-toggle-video');
@@ -136,6 +185,7 @@ var userMedia = navigator.mediaDevices.getUserMedia(constraints)
             }
             btnToggleVideo.innerHTML = 'Video On';
         });
+        
     })
     .catch(error => {
         console.log('Error accessing media devices.', error);
@@ -177,6 +227,11 @@ function sendSignal(action, message) {
     webSocket.send(jsonStr); //Se ejecuta función receive de consumers.py
 }
 
+function clearIntervalIds(peerUsername){
+    clearInterval(intervalIds[peerUsername]);
+    delete intervalIds[peerUsername];
+}
+
 function createOfferer(peerUsername, receiver_channel_name){
     var peer = new RTCPeerConnection(null);
 
@@ -189,8 +244,8 @@ function createOfferer(peerUsername, receiver_channel_name){
 
     dc.addEventListener('message', dcOnMessage); // Para mensajes del chat
 
-    var remoteVideo = createVideo(peerUsername);
-    setOnTrack(peer, remoteVideo);
+    var {remoteVideo, remoteCanvas} = createVideo(peerUsername);
+    setOnTrack(peer, remoteVideo, remoteCanvas, peerUsername);
 
     mapPeers[peerUsername] = [peer, dc];
 
@@ -205,6 +260,10 @@ function createOfferer(peerUsername, receiver_channel_name){
             }
 
             removeVideo(remoteVideo);
+
+            if(username == 'admin'){
+                clearIntervalIds(peerUsername);
+            }
         }
     });
 
@@ -216,7 +275,7 @@ function createOfferer(peerUsername, receiver_channel_name){
             return;
         }
 
-        console.log('Se enviará sendSignal');
+        console.log('Se enviará sendSignal NewOffer');
         sendSignal('new-offer', {
             'sdp': peer.localDescription,
             'receiver_channel_name': receiver_channel_name
@@ -235,8 +294,8 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
 
     addLocalTracks(peer);
 
-    var remoteVideo = createVideo(peerUsername);
-    setOnTrack(peer, remoteVideo);
+    var {remoteVideo, remoteCanvas} = createVideo(peerUsername);
+    setOnTrack(peer, remoteVideo, remoteCanvas, peerUsername);
 
     peer.addEventListener('datachannel', e => {
         peer.dc = e.channel;
@@ -260,6 +319,10 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
             }
 
             removeVideo(remoteVideo);
+
+            if(username == 'admin'){
+                clearIntervalIds(peerUsername);
+            }
         }
     });
 
@@ -269,6 +332,7 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
             return;
         }
 
+        console.log('Se enviará sendSignal NewAnswer');
         sendSignal('new-answer', {
             'sdp': peer.localDescription,
             'receiver_channel_name': receiver_channel_name
@@ -309,21 +373,48 @@ function createVideo(peerUsername){
     remoteVideo.autoplay = true;
     remoteVideo.playsInline = true;
 
+    var remoteCanvas = document.createElement('canvas');
+    remoteCanvas.id = peerUsername + '-canvas';
+    remoteCanvas.classList.add('position-absolute','top-0','left-0');
+
     var videoWrapper = document.createElement(('div'));
+    videoWrapper.classList.add('position-relative');
 
     videoContainer.appendChild(videoWrapper);
     videoWrapper.appendChild(remoteVideo);
+    videoWrapper.appendChild(remoteCanvas);
 
-    return remoteVideo;
+    return {remoteVideo, remoteCanvas};
 }
 
-function setOnTrack(peer, remoteVideo){
+function setOnTrack(peer, remoteVideo, remoteCanvas, peerUsername){
     var remoteStream = new MediaStream();
 
     remoteVideo.srcObject = remoteStream;
 
     peer.addEventListener('track', async (event) => {
         remoteStream.addTrack(event.track, remoteStream);
+                
+        if(username == 'admin' && event.track.kind == 'video'){
+            intervalIds[peerUsername] = setInterval(() => {
+                remoteCanvas.width = remoteVideo.videoWidth;
+                remoteCanvas.height = remoteVideo.videoHeight;
+                if(remoteStream.getVideoTracks()[0].enabled){
+                    // Create a virtual canvas to draw current video image
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = remoteVideo.videoWidth;
+                    canvas.height = remoteVideo.videoHeight;
+                    ctx.drawImage(remoteVideo, 0, 0);
+                            
+                    sendSignal('frame', {
+                        'image': canvas.toDataURL().split(',')[1],
+                        'peerUsername': peerUsername
+                    });
+                }
+            }, IMAGE_INTERVAL_MS);
+            
+        }
     })
     
 }
@@ -335,7 +426,7 @@ function removeVideo(video){
 }
 
 function getDataChannels(){
-    var dataChannels = [];console.log('mapPeers: ', mapPeers);
+    var dataChannels = [];
     for (peerUsername in mapPeers) {
         var dataChannel = mapPeers[peerUsername][1];
         dataChannels.push(dataChannel);
