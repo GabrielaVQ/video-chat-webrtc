@@ -79,16 +79,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
             frameBytes = base64.b64decode(message['image'])
             frameVector = np.frombuffer(frameBytes, dtype=np.uint8)
             frameMatrix = cv2.imdecode(frameVector, 1)
+            cv2.imwrite("filename1.jpeg", frameMatrix)
+            
             frameMatrixGray = cv2.cvtColor(frameMatrix, cv2.COLOR_BGR2GRAY)
+
             facePoints = cascade_classifier.detectMultiScale(frameMatrixGray)
+            print(facePoints)
 
             if(len(facePoints)>0):
                 receive_dict['message']['face'] = facePoints[0].tolist()
+
+                for (x,y,w,h) in facePoints:
+                    faceImage = frameMatrix[y:y+h,x:x+w]
+
+                cv2.imwrite("filename3.jpeg", faceImage)
             else:
                 receive_dict['message']['face'] = None
 
             del receive_dict['message']['image']
-            print(receive_dict)
 
             await self.channel_layer.send(
                 receiver_channel_name,
