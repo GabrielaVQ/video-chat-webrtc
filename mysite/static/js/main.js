@@ -35,7 +35,9 @@ function drawFaceRectangles(video, canvas, face) {
     ctx.strokeStyle = "green";
     ctx.lineWidth = 5
     ctx.beginPath();
-    ctx.rect(face[0], face[1], face[2], face[3]);
+    for (const [x, y, w, h] of face) {
+        ctx.rect(x, y, w, h);
+    }
     ctx.stroke();
 }
 
@@ -102,10 +104,10 @@ btnJoin.addEventListener('click', () => {
 
     usernameInput.value = '';
     usernameInput.disabled = true;
-    usernameInput.style.visibility = 'hidden';
+    usernameInput.classList.add('d-none');
 
     btnJoin.disabled = true;
-    btnJoin.style.visibility = 'hidden';
+    btnJoin.classList.add('d-none');
 
     var labelUsername = document.querySelector('#label-username');
     labelUsername.innerHTML = username;

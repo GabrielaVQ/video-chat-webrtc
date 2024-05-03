@@ -4,6 +4,15 @@
 .position-absolute {
     position: absolute;
 }
+.d-none {
+    display: none;
+}
+.mt-2 {
+    margin-top: 1em;
+}
+.mb-2 {
+    margin-bottom: 1em;
+}
 .top-0 {
     top: 0;
 }

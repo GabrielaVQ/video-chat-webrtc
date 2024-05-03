@@ -87,7 +87,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print(facePoints)
 
             if(len(facePoints)>0):
-                receive_dict['message']['face'] = facePoints[0].tolist()
+                receive_dict['message']['face'] = facePoints.tolist()
 
                 for (x,y,w,h) in facePoints:
                     faceImage = frameMatrix[y:y+h,x:x+w]
