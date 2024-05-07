@@ -59,6 +59,7 @@ function webSocketOnMessage(event){
             var peerCanvas = document.querySelector('#' + peerFrame + '-canvas');
             if(parsedData['message']['face']){
                 console.log(parsedData['message']['face']);
+                console.log(parsedData['message']['fer']);
                 drawFaceRectangles(peerVideo, peerCanvas, parsedData['message']['face']);
             }else{
                 /* cleanFaceRectangles(peerVideo, peerCanvas); */

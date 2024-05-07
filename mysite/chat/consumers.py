@@ -7,10 +7,18 @@ import base64
 import random
 import numpy as np
 
+import onnxruntime as ort
+import io
+from PIL import Image
+
 cascade_classifier = cv2.CascadeClassifier()
 cascade_classifier.load(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     )
+
+ort_session = ort.InferenceSession('model-exp-65.onnx')
+TRHESHOLD = 0.5
+labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -93,6 +101,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     faceImage = frameMatrix[y:y+h,x:x+w]
 
                 cv2.imwrite("filename3.jpeg", faceImage)
+                
+                # Reconocimiento de Expresiones faciales
+                # Preprocesado
+                faceImageGray = cv2.cvtColor(faceImage, cv2.COLOR_BGR2GRAY)
+                faceImageGray = cv2.resize(faceImageGray, (48, 48))
+                faceImageGray = np.expand_dims(np.expand_dims(faceImageGray, axis=0), axis=0)
+                input = faceImageGray.astype(np.float32)
+                # Evalución
+                ort_inputs = {
+                    "input" : input
+                }
+                ort_outs = ort_session.run(['output'], ort_inputs)
+                # Encontrar el índice del valor máximo en la salida
+                max_index = np.argmax(ort_outs)
+                # Obtener la etiqueta correspondiente al índice máximo
+                emotion_label = labels[max_index]
+                receive_dict['message']['fer'] = emotion_label
+                print("Expresión facial detectada:", emotion_label)
+                print('Expresión facial:', str(ort_outs))
+
             else:
                 receive_dict['message']['face'] = None
 
