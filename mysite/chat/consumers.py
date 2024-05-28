@@ -1,24 +1,24 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
-import asyncio
 
 import cv2
 import base64
 import random
 import numpy as np
 
-import onnxruntime as ort
-import io
-from PIL import Image
+import onnxruntime
 
+#Carga de clasificador de rostros frontal
 cascade_classifier = cv2.CascadeClassifier()
 cascade_classifier.load(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     )
 
-ort_session = ort.InferenceSession('model-exp-65.onnx')
-TRHESHOLD = 0.5
-labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+# Carga de modelo frontal/no frontal
+ort_session = onnxruntime.InferenceSession("chat/models/model.onnx", providers=['AzureExecutionProvider', 'CPUExecutionProvider'])
+
+""" imagen = cv2.imread('chat/models/img1.jpg')
+print(imagen.shape) """
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -76,56 +76,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'receive_dict': receive_dict,
                 }
             )
-
             return
         
         if(action == 'frame'):
             receiver_channel_name = self.channel_name
-            #with open(str(random.randint(100, 600))+'.jpg', "wb") as file:
-            #    file.write(base64.b64decode(message['image']))
-                
+            del receive_dict['message']['image']
+
             frameBytes = base64.b64decode(message['image'])
             frameVector = np.frombuffer(frameBytes, dtype=np.uint8)
             frameMatrix = cv2.imdecode(frameVector, 1)
-            cv2.imwrite("filename1.jpeg", frameMatrix)
-            
+
+            #Rostros
             frameMatrixGray = cv2.cvtColor(frameMatrix, cv2.COLOR_BGR2GRAY)
-
             facePoints = cascade_classifier.detectMultiScale(frameMatrixGray)
-            print(facePoints)
-
             if(len(facePoints)>0):
-                receive_dict['message']['face'] = facePoints[0].tolist()
-
+                receive_dict['message']['face'] = facePoints.tolist()
                 for (x,y,w,h) in facePoints:
                     faceImage = frameMatrix[y:y+h,x:x+w]
-
-                cv2.imwrite("filename3.jpeg", faceImage)
-                
-                # Reconocimiento de Expresiones faciales
-                # Preprocesado
-                faceImageGray = cv2.cvtColor(faceImage, cv2.COLOR_BGR2GRAY)
-                faceImageGray = cv2.resize(faceImageGray, (48, 48))
-                faceImageGray = np.expand_dims(np.expand_dims(faceImageGray, axis=0), axis=0)
-                input = faceImageGray.astype(np.float32)
-                # Evalución
-                ort_inputs = {
-                    "input" : input
-                }
-                ort_outs = ort_session.run(['output'], ort_inputs)
-                # Encontrar el índice del valor máximo en la salida
-                max_index = np.argmax(ort_outs)
-                # Obtener la etiqueta correspondiente al índice máximo
-                emotion_label = labels[max_index]
-                receive_dict['message']['fer'] = emotion_label
-                print("Expresión facial detectada:", emotion_label)
-                print('Expresión facial:', str(ort_outs))
-
+                #cv2.imwrite("filename3.jpeg", faceImage)
             else:
                 receive_dict['message']['face'] = None
 
-            del receive_dict['message']['image']
+            #Frontal o no frontal
+            ort_inputs = {'input': frameMatrix.astype(np.float32)}
+            ort_outs = ort_session.run(None, ort_inputs)
+            receive_dict['message']['frontal'] = ort_outs[1][0].tolist()
 
+            #Enviar resultados
             await self.channel_layer.send(
                 receiver_channel_name,
                 {

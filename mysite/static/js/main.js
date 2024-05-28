@@ -1,6 +1,6 @@
 console.log('In main.js');
 
-const IMAGE_INTERVAL_MS = 1000;
+const IMAGE_INTERVAL_MS = 2000;
 
 var mapPeers = {}; //Pares nuevos que se unen, no incluye el local
 var intervalIds = {};
@@ -23,20 +23,33 @@ function cleanFaceRectangles(video, canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.stroke();
 }
-function drawFaceRectangles(video, canvas, face) {
+function drawResult(video, canvas, face, frontal) {
     const ctx = canvas.getContext('2d');
   
     ctx.width = video.videoWidth;
     ctx.height = video.videoHeight;
   
+    //Cuadro para rostro
     ctx.beginPath();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = "green";
     ctx.lineWidth = 5
     ctx.beginPath();
-    ctx.rect(face[0], face[1], face[2], face[3]);
+    for (const [x, y, w, h] of face) {
+        ctx.rect(x, y, w, h);
+    }
     ctx.stroke();
+
+    //Frontal no frontal
+    ctx.font = "30px Arial";
+    if(frontal) {
+        ctx.fillStyle = "green";
+        ctx.fillText("Frontal", 50, 50);
+    } else {
+        ctx.fillStyle = "red";
+        ctx.fillText("No frontal", 50, 50);
+    }
 }
 
 function webSocketOnMessage(event){
@@ -58,9 +71,7 @@ function webSocketOnMessage(event){
             var peerVideo = document.querySelector('#' + peerFrame + '-video');
             var peerCanvas = document.querySelector('#' + peerFrame + '-canvas');
             if(parsedData['message']['face']){
-                console.log(parsedData['message']['face']);
-                console.log(parsedData['message']['fer']);
-                drawFaceRectangles(peerVideo, peerCanvas, parsedData['message']['face']);
+                drawResult(peerVideo, peerCanvas, parsedData['message']['face'], parsedData['message']['frontal']);
             }else{
                 /* cleanFaceRectangles(peerVideo, peerCanvas); */
             }
@@ -68,12 +79,12 @@ function webSocketOnMessage(event){
         return
     }
 
-    if(action == 'new-peer'){ console.log('MESSAGE: New peer');
+    if(action == 'new-peer'){
         createOfferer(peerUsername, receiver_channel_name);
         return;
     }
 
-    if(action == 'new-offer'){ console.log('MESSAGE: New offer');
+    if(action == 'new-offer'){
         var offer = parsedData['message']['sdp'];
 
         createAnswerer(offer, peerUsername, receiver_channel_name);
@@ -103,10 +114,10 @@ btnJoin.addEventListener('click', () => {
 
     usernameInput.value = '';
     usernameInput.disabled = true;
-    usernameInput.style.visibility = 'hidden';
+    usernameInput.classList.add('d-none');
 
     btnJoin.disabled = true;
-    btnJoin.style.visibility = 'hidden';
+    btnJoin.classList.add('d-none');
 
     var labelUsername = document.querySelector('#label-username');
     labelUsername.innerHTML = username;
