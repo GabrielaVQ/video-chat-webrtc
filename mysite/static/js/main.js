@@ -13,6 +13,10 @@ var webSocket;
 
 var localCanvas = document.getElementById("myCanvas");
 
+var head = ['No atento', 'Atento'];
+var emotions = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'];
+var negativeEmotions = [0,1,2,5];
+
 function cleanFaceRectangles(video, canvas) {
     const ctx = canvas.getContext('2d');
 
@@ -23,7 +27,7 @@ function cleanFaceRectangles(video, canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.stroke();
 }
-function drawResult(video, canvas, face, frontal) {
+function drawResult(video, canvas, face, frontal, emotion) {
     const ctx = canvas.getContext('2d');
   
     ctx.width = video.videoWidth;
@@ -41,15 +45,25 @@ function drawResult(video, canvas, face, frontal) {
     }
     ctx.stroke();
 
+
+    label = head[frontal]
     //Frontal no frontal
     ctx.font = "30px Arial";
     if(frontal) {
         ctx.fillStyle = "green";
-        ctx.fillText("Frontal", 50, 50);
+        label = emotions[emotion]
+        //Emociones
+        if(emotion != null){
+            if(negativeEmotions .includes(emotion)){
+                ctx.fillStyle = "orange";
+            }
+        }
+        
     } else {
         ctx.fillStyle = "red";
-        ctx.fillText("No frontal", 50, 50);
     }
+    ctx.fillText(label, 50, 50);
+
 }
 
 function webSocketOnMessage(event){
@@ -71,9 +85,7 @@ function webSocketOnMessage(event){
             var peerVideo = document.querySelector('#' + peerFrame + '-video');
             var peerCanvas = document.querySelector('#' + peerFrame + '-canvas');
             if(parsedData['message']['face']){
-                drawResult(peerVideo, peerCanvas, parsedData['message']['face'], parsedData['message']['frontal']);
-            }else{
-                /* cleanFaceRectangles(peerVideo, peerCanvas); */
+                drawResult(peerVideo, peerCanvas, parsedData['message']['face'], parsedData['message']['frontal'], parsedData['message']['emotion']);
             }
         }
         return
