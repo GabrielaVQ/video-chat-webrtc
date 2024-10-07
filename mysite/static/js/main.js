@@ -13,8 +13,8 @@ var webSocket;
 
 var localCanvas = document.getElementById("myCanvas");
 
-var head = ['No atento', 'Atento'];
-var emotions = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'];
+var head = ['No front', 'Front'];
+var emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise'];
 var negativeEmotions = [0,1,2,5];
 
 function cleanFaceRectangles(video, canvas) {
@@ -34,35 +34,30 @@ function drawResult(video, canvas, face, frontal, emotion) {
     ctx.height = video.videoHeight;
   
     //Cuadro para rostro
-    ctx.beginPath();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = "green";
-    ctx.lineWidth = 5
-    ctx.beginPath();
-    for (const [x, y, w, h] of face) {
-        ctx.rect(x, y, w, h);
-    }
-    ctx.stroke();
-
-
-    label = head[frontal]
-    //Frontal no frontal
-    ctx.font = "30px Arial";
-    if(frontal) {
-        ctx.fillStyle = "green";
-        label = emotions[emotion]
-        //Emociones
-        if(emotion != null){
-            if(negativeEmotions .includes(emotion)){
-                ctx.fillStyle = "orange";
-            }
+    if(face != null){
+        ctx.beginPath();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 5;
+        for (const [x, y, w, h] of face) {
+            ctx.rect(x, y, w, h);
         }
-        
-    } else {
-        ctx.fillStyle = "red";
+        ctx.stroke();
     }
+
+    ctx.font = "30px Arial";
+
+    //Frontal no frontal
+    label = head[frontal]    
+    ctx.fillStyle = "blue";
     ctx.fillText(label, 50, 50);
+
+    //Emociones
+    if(emotion != null){
+        label = emotions[emotion]
+        ctx.fillStyle = "red";
+        ctx.fillText(label, 50, 100);
+    }  
 
 }
 

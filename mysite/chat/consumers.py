@@ -83,36 +83,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
             frameVector = np.frombuffer(frameBytes, dtype=np.uint8)
             frameMatrix = cv2.imdecode(frameVector, 1)
 
-            #Rostros
-            frameMatrixGray = cv2.cvtColor(frameMatrix, cv2.COLOR_BGR2GRAY)
-            facePoints = cascade_classifier.detectMultiScale(frameMatrixGray)
-
             receive_dict['message']['face'] = None
             receive_dict['message']['emotion'] = None
+
+            #Frontal o no frontal
+            inputModelHead = {'input': frameMatrix.astype(np.float32)}
+            outputModelHead = model_biwi.run(None, inputModelHead)
+            receive_dict['message']['frontal'] = outputModelHead[1][0].tolist()
+
+            #Puntos para rostros
+            frameMatrixGray = cv2.cvtColor(frameMatrix, cv2.COLOR_BGR2GRAY)
+            facePoints = cascade_classifier.detectMultiScale(frameMatrixGray)
+            
             if(len(facePoints)>0):
                 receive_dict['message']['face'] = facePoints.tolist()
                 for (x,y,w,h) in facePoints:
                     faceImage = frameMatrix[y:y+h,x:x+w]
 
-                #Frontal o no frontal
-                inputModelHead = {'input': frameMatrix.astype(np.float32)}
-                outputModelHead = model_biwi.run(None, inputModelHead)
-                receive_dict['message']['frontal'] = outputModelHead[1][0].tolist()
-
                 #emociones
-                if(receive_dict['message']['frontal']):
-                    inputModelEmotion = {'input': faceImage.astype(np.float32)}
-                    outputModelEmotion = model_fer2013.run(None, inputModelEmotion)
-                    receive_dict['message']['emotion'] = outputModelEmotion[1][0].tolist()
+                inputModelEmotion = {'input': faceImage.astype(np.float32)}
+                outputModelEmotion = model_fer2013.run(None, inputModelEmotion)
+                receive_dict['message']['emotion'] = outputModelEmotion[1][0].tolist()
 
-                #Enviar resultados
-                await self.channel_layer.send(
-                    receiver_channel_name,
-                    {
-                        'type': 'send.sdp',
-                        'receive_dict': receive_dict,
-                    }
-                )
+            #Enviar resultados
+            await self.channel_layer.send(
+                receiver_channel_name,
+                {
+                    'type': 'send.sdp',
+                    'receive_dict': receive_dict,
+                }
+            )
 
             return
 
